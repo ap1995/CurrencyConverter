@@ -5,6 +5,7 @@
  * ==============================================================================*/
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.UI;
 using System;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -41,6 +42,15 @@ public class UDTEventHandler : MonoBehaviour, IUserDefinedTargetEventHandler
     TrackableSettings m_TrackableSettings;
     FrameQualityMeter m_FrameQualityMeter;
 	private bool mShowGUIRect = false;
+
+
+	public SampleButton sb;
+	public Item item;
+	public ShopScrollList sslist;
+
+	private Currency currentRate;
+	private float currentCurrencyRate;
+	private float maxScaleHeight;
 
     // DataSet that newly defined targets are added to
     DataSet m_UDT_DataSet;
@@ -126,10 +136,15 @@ public class UDTEventHandler : MonoBehaviour, IUserDefinedTargetEventHandler
 	}
 
 	public class RectCoords{
-		public List<Vertex> vertices;
+		public Vertex startvertex;
+		public int width;
+		public int height;
 	}
 
 	private RectCoords rect1;
+	private List<RectCoords> boundingBoxes;
+	public Camera cam;
+	public bool toggle;
 
 	[System.Serializable]
 	public class Property {
@@ -218,9 +233,11 @@ public class UDTEventHandler : MonoBehaviour, IUserDefinedTargetEventHandler
 		public float USDJPY;
 	}
 
+	private List<float> values = new List<float> ();
+
     #region MONOBEHAVIOUR_METHODS
     void Start()
-    {
+	{	
         m_TargetBuildingBehaviour = GetComponent<UserDefinedTargetBuildingBehaviour>();
 
         if (m_TargetBuildingBehaviour)
@@ -237,6 +254,16 @@ public class UDTEventHandler : MonoBehaviour, IUserDefinedTargetEventHandler
         {
             m_QualityDialog.GetComponent<CanvasGroup>().alpha = 0;
         }
+
+		//sb = new SampleButton ();
+		//createButtonList ();
+
+		IEnumerator coroutine;
+		coroutine = callCurrencyApi();
+		StartCoroutine(coroutine);
+		cam = Camera.main;
+		toggle=true;
+
     }
     #endregion //MONOBEHAVIOUR_METHODS
 
@@ -255,6 +282,14 @@ public class UDTEventHandler : MonoBehaviour, IUserDefinedTargetEventHandler
             m_ObjectTracker.ActivateDataSet(m_UDT_DataSet);
         }
     }
+
+	private void createButtonList(){
+
+		Item item1 = new Item ();
+		item1.itemName = "inr";
+		//item1.icon = 
+		
+	}
 
     /// <summary>
     /// Updates the current frame quality
@@ -305,6 +340,10 @@ public class UDTEventHandler : MonoBehaviour, IUserDefinedTargetEventHandler
         ImageTargetBehaviour imageTargetCopy = Instantiate(ImageTargetTemplate);
         imageTargetCopy.gameObject.name = "UserDefinedTarget-" + m_TargetCounter;
 
+		foreach (var component in imageTargetCopy.gameObject.GetComponentsInChildren<Component>()) {
+			Debug.Log("Children components"+component.name);
+		}
+
         // Add the duplicated trackable to the data set and activate it
         m_UDT_DataSet.CreateTrackable(trackableSource, imageTargetCopy.gameObject);
 
@@ -333,46 +372,48 @@ public class UDTEventHandler : MonoBehaviour, IUserDefinedTargetEventHandler
     public void BuildNewTarget()
 	{	Debug.Log("Build new target function called ");
 
-		Vuforia.Image image = CameraDevice.Instance.GetCameraImage(Vuforia.Image.PIXEL_FORMAT.RGB888);
-
-		if (image != null) {
-			Debug.Log (
-				"\nImage Format: " + image.PixelFormat +
-				"\nImage Size:   " + image.Width + "x" + image.Height +
-				"\nBuffer Size:  " + image.BufferWidth + "x" + image.BufferHeight +
-				"\nImage Stride: " + image.Stride + "\n"
-			);
-
-			Texture2D tex = new Texture2D (image.Width, image.Height, TextureFormat.RGB24, false);
-			image.CopyToTexture(tex);
-			// tex.ReadPixels (new Rect(0, 0, image.Width, image.Height), 0, 0);
-			tex.Apply ();
-
-			byte[] bytes = tex.EncodeToPNG();
-			Destroy(tex);
-
-			// For testing purposes, also write to a file in the project folder
-			File.WriteAllBytes(Application.persistentDataPath + "/appscreenshot.png", bytes);
-
-
-			IEnumerator coroutine;
-			coroutine = Callapi();
-			StartCoroutine(coroutine);
-
-
-		} else {
-			
-			Debug.Log ("unfortunately image is null");
-		}
+//		Vuforia.Image image = CameraDevice.Instance.GetCameraImage(Vuforia.Image.PIXEL_FORMAT.RGB888);
+//
+//		if (image != null) {
+//			Debug.Log (
+//				"\nImage Format: " + image.PixelFormat +
+//				"\nImage Size:   " + image.Width + "x" + image.Height +
+//				"\nBuffer Size:  " + image.BufferWidth + "x" + image.BufferHeight +
+//				"\nImage Stride: " + image.Stride + "\n"
+//			);
+//
+//			Texture2D tex = new Texture2D (image.Width, image.Height, TextureFormat.RGB24, false);
+//			image.CopyToTexture(tex);
+//			// tex.ReadPixels (new Rect(0, 0, image.Width, image.Height), 0, 0);
+//			tex.Apply ();
+//
+//			byte[] bytes = tex.EncodeToPNG();
+//			Destroy(tex);
+//
+//			// For testing purposes, also write to a file in the project folder
+//			File.WriteAllBytes(Application.persistentDataPath + "/appscreenshot.png", bytes);
+//
+//
+//
+//
+//
+//		} else {
+//			
+//			Debug.Log ("unfortunately image is null");
+//		}
         if (m_FrameQuality == ImageTargetBuilder.FrameQuality.FRAME_QUALITY_MEDIUM ||
             m_FrameQuality == ImageTargetBuilder.FrameQuality.FRAME_QUALITY_HIGH)
         {
             // create the name of the next target.
             // the TrackableName of the original, linked ImageTargetBehaviour is extended with a continuous number to ensure unique names
             string targetName = string.Format("{0}-{1}", ImageTargetTemplate.TrackableName, m_TargetCounter);
-
+			Debug.Log ("NAME OF NEXT TARGET IS !!!! - " + targetName);
             // generate a new target:
             m_TargetBuildingBehaviour.BuildNewTarget(targetName, ImageTargetTemplate.GetSize().x);
+
+			IEnumerator coroutine;
+			coroutine = Callapi();
+			StartCoroutine(coroutine);
         }
         else
         {
@@ -400,6 +441,7 @@ public class UDTEventHandler : MonoBehaviour, IUserDefinedTargetEventHandler
 		Debug.Log ("Waited for 1 second");
 		string url_ss = Application.persistentDataPath +"/UnityScreenshot.png";
 		byte[] imgbytes = File.ReadAllBytes(url_ss);
+		Debug.Log ("!!!!!!Checking for image bytes size !!!"+imgbytes.Length);
 		string base64 = System.Convert.ToBase64String(imgbytes);
 		Debug.Log ("After saving image");
 
@@ -467,16 +509,12 @@ public class UDTEventHandler : MonoBehaviour, IUserDefinedTargetEventHandler
 		foreach (Match m in mc) {
 			Debug.Log(m);
 			string curr = m.ToString().Substring(1);
-			float value = float.Parse(curr);
-			//float value =(float) curr.Substring (1);
-			IEnumerator coroutine;
-			coroutine = callCurrencyApi(value);
-			StartCoroutine(coroutine);
-
-		}
+			values.Add(float.Parse(curr));
+			//overlayCurrency was here
+			}
 	}
 
-	private IEnumerator callCurrencyApi(float value){
+	private IEnumerator callCurrencyApi(){
 		string url = "http://apilayer.net/api/live?access_key=91d993035856f000b4b918bf293ca711&currencies=EUR,GBP,CAD,INR,HKD,JPY&source=USD&format=1";
 		UnityWebRequest uwr = UnityWebRequest.Get(url);
 
@@ -491,17 +529,146 @@ public class UDTEventHandler : MonoBehaviour, IUserDefinedTargetEventHandler
 		else
 		{
 			Debug.Log("Received in callCurrencyApi: " + uwr.downloadHandler.text);
-			//float rupeeVal = uwr.downloadHandler.text;
-			//JSONObject json = new JSONObject(uwr.downloadHandler.text);
-			Currency currency = JsonUtility.FromJson<Currency>(uwr.downloadHandler.text);
-			Debug.Log("Value "+value);
-			Debug.Log("JSON -- "+currency.terms);
-			Debug.Log("Rate -- "+currency.quotes.USDINR);
-			Debug.Log("Final value -- "+ (value * currency.quotes.USDINR));
-			//AnnotateImageResponses responses = JsonUtility.FromJson<AnnotateImageResponses>(webRequest.downloadHandler.text);
-			//Sample_OnAnnotateImageResponses(responses);
+			currentRate = JsonUtility.FromJson<Currency>(uwr.downloadHandler.text);
+			Debug.Log("JSON terms -- "+currentRate.terms);
+			currentCurrencyRate = currentRate.quotes.USDINR;
+			Debug.Log("Current USD Rate -- "+currentRate.quotes.USDINR);
 
 		}
+	}
+
+	void overlayCurrency(float currentCurrencyRate){
+
+		//var allComponents : Component[];
+		//allComponents = gameObject.GetComponents("UserDefinedTarget-1");
+
+//		foreach (var comp in GameObject.Find("UserDefinedTarget-1").GetComponent<Component>()) {
+//			Debug.Log("Children components in overlay"+comp.name);
+//		}
+
+		Debug.Log ("in overlay method");
+		//TextMesh textObject = GameObject.Find("UserDefinedTarget-1").GetComponent<TextMesh>();
+
+		//GameObject ARCamera = GameObject.Find ("ARCamera").GetComponentsInChildren<Component> ();
+
+		foreach(var component in GameObject.Find("UserDefinedTarget-1").GetComponentsInChildren<Component>()){
+			
+			if (component.name == "CurrencyOverlay") {
+				Debug.Log("Screen Width : " + Screen.width);
+				Debug.Log("Screen Height : " + Screen.height);
+				Vector3 fullScreen = Camera.main.ScreenToWorldPoint(new Vector3(Screen.width,Screen.height,10));
+				Vector3 fullScreen1 = Camera.main.ScreenToWorldPoint(new Vector3(Screen.width,Screen.height,cam.nearClipPlane));
+				Debug.Log ("Full screen coords with z=10 : " + fullScreen.x + " - " + fullScreen.y + " - " + fullScreen.z);
+				Debug.Log ("Full screen coords with z=nearClipPlane : " + fullScreen1.x + " - " + fullScreen1.y + " - " + fullScreen1.z);
+				Vector3 z1 = Camera.main.ScreenToWorldPoint(new Vector3(0,0,10));
+				Vector3 z2 = Camera.main.ScreenToWorldPoint(new Vector3(0,0,cam.nearClipPlane));
+				Debug.Log ("0 coords with z=10 : " + z1.x + " - " + z1.y + " - " + z1.z);
+				Debug.Log ("0 coords with z=nearClipPlane : " + z2.x + " - " + z2.y + " - " + z2.z);
+
+				Debug.Log("Looking for GOs....");
+
+				// int count = Camera.allCameras.Length;
+
+//				for (int i = 0; i < count; i++) {
+//					print ("Name of camera " + cams[i].name); 
+//				}
+				GameObject textTemp = GameObject.Find("UserDefinedTarget-1/CurrencyOverlay");
+				GameObject parentObject = GameObject.Find ("UserDefinedTarget-1");
+				int noCurrencies = boundingBoxes.Count;
+				Debug.Log ("Bounding boxes count - " + noCurrencies.ToString ());
+				GameObject[] players = new GameObject[noCurrencies];
+				float yPos = 0.2F;
+
+
+				for (int i=0; i<noCurrencies; i++)
+				{	
+					Debug.Log ("Bounding box start vertex x "+boundingBoxes [i].startvertex.x);
+					Debug.Log ("Bounding box start vertex y "+boundingBoxes [i].startvertex.y);
+					Vector3 temp = new Vector3 (boundingBoxes [i].startvertex.x, boundingBoxes [i].startvertex.y, 10);
+					Vector3 point = cam.ScreenToWorldPoint (temp);
+					Debug.Log ("Pixel points to transform --- " + temp.x.ToString () + " " + temp.y.ToString ());
+					Debug.Log ("New found point is --- " + point.x.ToString () + " " + point.y.ToString () + " " + point.z.ToString ());
+					players[i] = Instantiate(textTemp, point, Quaternion.Euler(new Vector3(90, 180, 270)));
+					// players[i] = Instantiate(textTemp, parentObject.transform, instantiateInWorldSpace=true);
+					float newScale = boundingBoxes[i].height/maxScaleHeight;
+					players[i].transform.localScale = new Vector3(0.5F*newScale, 0.5F*newScale, 0.5F*newScale);
+					players [i].GetComponent<TextMesh>().text = (values[i] * currentCurrencyRate).ToString() ;
+					// players[i].transform.position = new Vector3(0, 0, yPos);
+					players[i].transform.position = new Vector3(-point.x, point.y+0.1f, point.z);
+					// players[i].transform.RotateAround(Vector3.zero, Vector3.up, 2);
+					// players[i].transform.parent = imageTargetCopy.transform;
+					players[i].transform.parent = parentObject.transform;
+					yPos -= 0.2F;
+				}
+
+				component.GetComponent<TextMesh>().text = "";
+				Debug.Log ("Check X value is " + rect1.startvertex.x);
+				Debug.Log ("Check Y value is " + rect1.startvertex.y);
+				//component.GetComponent<TextMesh> ().transform.SetPositionAndRotation (new Vector3(rect1.startvertex.x,rect1.startvertex.y,0),new Quaternion(90,180,270,1));
+				//component.GetComponent<TextMesh> ().transform.position.Set(rect1.startvertex.x,rect1.startvertex.y,0);
+				//transform.position.Set(rect1.startvertex.x,rect1.startvertex.y,0);
+				Vector3 point2 = new Vector3(); 
+//				point2 = cam.ScreenToWorldPoint(new Vector3(rect1.startvertex.x, rect1.startvertex.y, cam.nearClipPlane));
+
+//				if (toggle == true) {
+//					point2 = cam.ScreenToWorldPoint (new Vector3 (rect1.startvertex.x, rect1.startvertex.y, cam.nearClipPlane));
+//					print ("Point2x " + point2.x.ToString ());
+//					print ("Point2y " + point2.y.ToString ());
+//					print ("Point2z " + point2.z.ToString ());
+//					Debug.Log ("Setting to new position");
+//					textTemp.transform.position = new Vector3 (point2.x, point2.y,-0.2f);
+//					toggle = false;
+//				}
+				//Debug.Log ("CHECK CHECK");
+				//Debug.Log (point2.x);
+				//textTemp.transform.position = new Vector3(point2.x, point2.y, 0);
+//				component.transform.position.Set (point2.x,point2.y,point2.z);
+//				component.transform.Translate (point2.x,0,0);
+				Debug.Log("Game object texttemp Position x -- " + textTemp.transform.position.x);
+				Debug.Log ("Gameobject texttemp Y pos --- " + textTemp.transform.position.y);
+				Debug.Log ("Gameobject texttemp z object --- " + textTemp.transform.position.z);
+				Debug.Log ("X position before"+component.transform.position.x);
+				Debug.Log ("Y position before"+component.transform.position.y);
+				Debug.Log ("Z position before"+component.transform.position.z);
+				Debug.Log ("transform X position before"+transform.position.x);
+				Debug.Log ("transform Y position before"+transform.position.y);
+				Debug.Log ("text mesh Z position before"+transform.position.z);
+				Debug.Log ("text mesh X position before"+component.GetComponent<TextMesh>().transform.position.x);
+				Debug.Log ("text mesh Y position before"+component.GetComponent<TextMesh>().transform.position.y);
+				Debug.Log ("text mesh Z position before"+component.GetComponent<TextMesh>().transform.position.z);
+				//component.transform.Translate (0,-30,-30);
+				//transform.Translate (2,2,0);
+//				Debug.Log ("X position after"+component.transform.position.x);
+//				Debug.Log ("Y position after"+component.transform.position.y);
+//				Debug.Log ("Z position after"+component.transform.position.z);
+//				Debug.Log ("Component overlay found");
+//				Debug.Log ("transform X position after"+transform.position.x);
+//				Debug.Log ("transform Y position after"+transform.position.y);
+//				Debug.Log ("transform Z position after"+transform.position.z);
+			}
+		
+		//textObject.text = "test1";
+
+		}
+
+
+//		if (GameObject.Find ("CurrencyOverlay")) {
+//			Debug.Log ("game object curr found");
+//			TextMesh textObject = GameObject.Find("CurrencyOverlay").GetComponent<TextMesh>();
+//			if (textObject) {
+//				Debug.Log ("Text obj val "+textObject.text);
+//				GameObject.Find ("CurrencyOverlay").SetActive (false);
+//				GameObject.Find ("CurrencyOverlay").GetComponent<TextMesh> ().text = "test1";
+//				GameObject.Find ("CurrencyOverlay").SetActive (true);
+//
+//				//textObject.text = "test1";
+//			}
+//
+//		}
+
+		//Debug.Log ("Text messh obj " + GetComponent (TextMesh).text);
+
+
 	}
 
 	Vector3 ScreenToWorld(float x, float y) {
@@ -517,6 +684,8 @@ public class UDTEventHandler : MonoBehaviour, IUserDefinedTargetEventHandler
 	}
 
 	void Sample_OnAnnotateImageResponses(AnnotateImageResponses responses) {
+		boundingBoxes = new List<RectCoords> ();
+		maxScaleHeight = 0.0f;
 		Debug.Log("In annotate image responses method");
 		if (responses.responses.Count > 0) {
 			if (responses.responses[0].textAnnotations != null && responses.responses[0].textAnnotations.Count > 0) {
@@ -524,65 +693,141 @@ public class UDTEventHandler : MonoBehaviour, IUserDefinedTargetEventHandler
 				foreach (var text in responses.responses[0].textAnnotations)
 				{
 					Debug.Log("ACTUAL TEXT " + text.description);
-					//showMatch(text.description,@"(\D)\s*([.\d,]+)");
-
 
 					if (text.description.StartsWith("$")) 
-					{
+					{	
+						showMatch(text.description,@"(\D)\s*([.\d,]+)");
 						Debug.Log ("Found string starting with $  " + text.description);
 						mShowGUIRect = true;
 						int i=0;
 						rect1 = new RectCoords ();
-						rect1.vertices = new List<Vertex>();
+						rect1.startvertex = new Vertex();
+
+						int xstart = 0;
+						int ystart = 0;
+
 						foreach (var vertex in text.boundingPoly.vertices) {
 
-							//rect1.vertices = new List<Vertex>();
+							Debug.Log ("dollar added POLY X  " + vertex.x);
+							Debug.Log ("dollar added POLY Y  " + vertex.y);
 
-							if (i % 2 != 0) {
-								Vertex a = new Vertex ();
-								a.x = vertex.x;
-								a.y = vertex.y;
-								rect1.vertices.Add (a);
-
-								Debug.Log ("dollar added POLY X  " + vertex.x);
-								Debug.Log ("dollar added POLY Y  " + vertex.y);
+							if(i == 0){
+								rect1.startvertex.x = vertex.x;
+								rect1.startvertex.y = vertex.y;
+								xstart = (int) vertex.x;
+								ystart = (int) vertex.y;
 							}
+							if(i == 1){
+								rect1.width = (int) (vertex.x - xstart);
+
+							}
+							if(i == 2){
+								rect1.height = (int) (vertex.y - ystart);
+								maxScaleHeight = Mathf.Max (maxScaleHeight, rect1.height);
+
+							}
+
 							i++;
+
+
 						}
+						Debug.Log ("Adding to bounding boxes array");
 
-					}
-
-
-
-
+						boundingBoxes.Add (rect1);
 				}
-
-				
-
 			}
 		}
 	}
+}
 
 	void OnGUI()
 
-	{	if(mShowGUIRect){
-			
-			Debug.Log("ONGUI method");
-			//Rect rect = ScreenRect((int)rect1.vertices[0].x, (int)rect1.vertices[0].y,(int) rect1.vertices[1].x, (int)rect1.vertices[1].y);
-			Texture sometexture;
-			sometexture = (Texture) Resources.Load("texture1");
-			//Debug.Log ("before drawing rectangle");
-			//GUI.DrawTexture (new Rect ((int)rect1.vertices[0].x, (int)rect1.vertices[0].y, (int) rect1.vertices[1].x, (int)rect1.vertices[1].y), sometexture );
-			//Debug.Log("Coord 1 " + (int)rect1.vertices[0].x);
-			//Debug.Log("Coord 2 " + (int)rect1.vertices [0].y);
-			//Debug.Log("Coord 3 " + (int)rect1.vertices[1].x);
-			//Debug.Log("Coord 4 " + (int)rect1.vertices[1].y);
+	{	
+		Texture sometexture;
+		Texture EUR;
+		Texture CAD;
+		Texture GBP;
+		Texture JPY;
+		Texture INR;
+		Texture HKD;
+		sometexture = (Texture) Resources.Load("texture1");
+		EUR = (Texture) Resources.Load("EUR");
+		GBP = (Texture) Resources.Load("GBP");
+		CAD = (Texture) Resources.Load("CAD");
+		HKD = (Texture) Resources.Load("HKD");
+		JPY = (Texture) Resources.Load("JPY");
+		INR = (Texture) Resources.Load("INR");
 
-			int coord1 = (int)rect1.vertices [0].x;
-			int coord2 = (int)rect1.vertices [0].y;
-			int coord3 = (int)rect1.vertices[1].x;
-			int coord4 = (int)rect1.vertices[1].y;
-			GUI.DrawTexture (new Rect (coord1,coord2,coord3,coord4), sometexture );
+		if( GUI.Button( new Rect (10, 200, 100, 100) , INR) )
+		{
+			Debug.Log ("Button INR clicked"); 
+			currentCurrencyRate = currentRate.quotes.USDINR;
+			Debug.Log ("currentCurrencyRate "+currentCurrencyRate);
+			foreach(var i in values){ 
+				//float convertedCurrency = i * currentCurrencyRate;
+				overlayCurrency (currentCurrencyRate);
+			}
+			//GUI.Button (new Rect (100, 100, 200, 200), sometexture);
+
+		}
+
+		if( GUI.Button( new Rect (10, 400, 100, 100) , EUR) )
+		{
+			Debug.Log ("Button EUR clicked"); 
+			currentCurrencyRate = currentRate.quotes.USDEUR;
+			Debug.Log ("currentCurrencyRate "+currentCurrencyRate);
+			//foreach(var i in values){ 
+				overlayCurrency (currentCurrencyRate);
+			//}
+		}
+
+		if( GUI.Button( new Rect (10, 600, 100, 100) , GBP) )
+		{
+			Debug.Log ("Button GBP clicked"); 
+			currentCurrencyRate = currentRate.quotes.USDGBP;
+			Debug.Log ("currentCurrencyRate "+currentCurrencyRate);
+			//foreach(var i in values){ 
+				overlayCurrency (currentCurrencyRate);
+			//}
+		}
+
+		if( GUI.Button( new Rect (10, 800, 100, 100) , CAD) )
+		{
+			Debug.Log ("Button CAD clicked"); 
+			currentCurrencyRate = currentRate.quotes.USDCAD;
+			Debug.Log ("currentCurrencyRate "+currentCurrencyRate);
+			//foreach(var i in values){ 
+				overlayCurrency (currentCurrencyRate);
+			//}
+		}
+
+		if( GUI.Button( new Rect (10, 1000, 100, 100) , HKD) )
+		{
+			Debug.Log ("Button HKD clicked");
+			currentCurrencyRate = currentRate.quotes.USDHKD;
+			Debug.Log ("currentCurrencyRate "+currentCurrencyRate);
+			//foreach(var i in values){ 
+				overlayCurrency (currentCurrencyRate);
+			//}
+		}
+		if( GUI.Button( new Rect (10, 1200, 100, 100) , JPY) )
+		{
+			Debug.Log ("Button JPY clicked"); 
+			currentCurrencyRate = currentRate.quotes.USDJPY;
+			Debug.Log ("currentCurrencyRate "+currentCurrencyRate);
+			//foreach(var i in values){ 
+				overlayCurrency (currentCurrencyRate);
+			//}
+		}
+		if(mShowGUIRect){
+			
+			//Debug.Log("ONGUI method");
+			//Rect rect = ScreenRect((int)rect1.vertices[0].x, (int)rect1.vertices[0].y,(int) rect1.vertices[1].x, (int)rect1.vertices[1].y);
+
+			//Debug.Log ("Width -- " + rect1.width);
+			//Debug.Log ("Height -- " + rect1.height);
+			//GUI.DrawTexture (new Rect (rect1.startvertex.x, rect1.startvertex.y, rect1.width, rect1.height), sometexture );
+			//GUI.DrawTexture (new Rect (0, 0, 100, 100), sometexture );
 			//Debug.Log ("after drawing rectangle");
 		}
 	}
